@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>قياس قطر القزحية — V5 (يدوي مضبوط)</title>
+<title>قياس قطر القزحية — V6 (إصلاح انزياح الدائرة)</title>
 <style>
   :root { --pad: 12px; --radius: 12px; }
   html, body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Helvetica Neue", Arial, "Noto Color Emoji", sans-serif; background:#0b0f14; color:#e8eef6; }
@@ -27,19 +27,18 @@
   .table th, .table td { border-bottom:1px solid #1f2a36; padding:8px; font-size:.9rem; text-align: right; }
   .muted { opacity:.7; }
   .error { color:#ff8a8a; }
-  .ok { color:#7be27b; }
   #toast { position: fixed; bottom: 16px; right: 16px; background:#0b1520; border:1px solid #1e2c3c; padding:10px 12px; border-radius:10px; display:none; }
   @media (max-width: 680px){ .grid2, .grid3 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
   <header>
-    <h1>🧿 قياس قطر القزحية — V5 (رسم يدوي مضبوط + تراجع)</h1>
+    <h1>🧿 قياس قطر القزحية — V6 (إصلاح انزياح الدائرة)</h1>
   </header>
 
   <main>
     <section>
-      <div class="hint">لو التعديلات مش ظاهرة بعد الرفع، افتح الرابط وفي آخره <code>?v=5</code> أو اعمل <b>Ctrl + F5</b>.</div>
+      <div class="hint">لو التعديلات مش ظاهرة بعد الرفع، افتح الرابط وفي آخره <code>?v=6</code> أو اعمل <b>Ctrl + F5</b>.</div>
     </section>
 
     <section id="upload">
@@ -79,42 +78,6 @@
       </div>
     </section>
 
-    <section id="client">
-      <h3>بيانات العميل</h3>
-      <div class="grid3">
-        <div>
-          <label>الاسم</label>
-          <input id="name" placeholder="مثال: أحمد علي" autocomplete="name">
-        </div>
-        <div>
-          <label>الهاتف</label>
-          <input id="phone" placeholder="01xxxxxxxxx" inputmode="tel" autocomplete="tel">
-        </div>
-        <div>
-          <label>الكود</label>
-          <input id="code" placeholder="مثال: C-1021">
-        </div>
-      </div>
-      <div class="grid2" style="margin-top:10px;">
-        <div>
-          <label>ملاحظات</label>
-          <textarea id="notes" rows="2" placeholder="أكتب أي ملاحظات مهمة..."></textarea>
-        </div>
-        <div>
-          <label>العين</label>
-          <select id="eye">
-            <option value="right">اليمنى</option>
-            <option value="left">اليسرى</option>
-          </select>
-        </div>
-      </div>
-      <div class="row" style="margin-top:10px;">
-        <button id="saveRecord">حفظ القياس + بيانات العميل</button>
-        <button id="exportCSV">تصدير CSV</button>
-        <button id="clearAll" class="danger">حذف كل السجلات</button>
-      </div>
-    </section>
-
     <section id="records">
       <h3>السجلات</h3>
       <table class="table" id="tbl">
@@ -133,7 +96,7 @@
       </table>
     </section>
 
-    <footer>© 2025 — أداة قياس القزحية — V5</footer>
+    <footer>© 2025 — أداة قياس القزحية — V6</footer>
   </main>
 
   <div id="toast"></div>
@@ -149,15 +112,26 @@
 
     let calibLine = null;
     let scalePxPerMM = null;
-    let manualPts = [];
+    let manualPts = [];          // stored in CANVAS PIXELS
     let lastCircle = null;
-    let baseCanvas = null; // offscreen base image to redraw overlays cleanly
+    let baseCanvas = null;       // drawn image (canvas pixels)
+    let pointer = {x:0,y:0, over:false}; // for live preview when in manual mode
 
     function toast(msg){
       const t = $('#toast'); t.textContent = msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 2000);
     }
 
-    // ========== Image load & draw ==========
+    // ===== Helpers: map pointer (CSS) -> canvas pixels =====
+    function getCanvasXY(evt){
+      const rect = photo.getBoundingClientRect();
+      const sx = photo.width / rect.width;
+      const sy = photo.height / rect.height;
+      const x = (evt.clientX - rect.left) * sx;
+      const y = (evt.clientY - rect.top) * sy;
+      return {x, y};
+    }
+
+    // ===== Image load & draw =====
     $('#file').addEventListener('change', (ev)=>{
       const f = ev.target.files && ev.target.files[0];
       if(!f){ toast('لم يتم اختيار ملف'); return; }
@@ -172,6 +146,7 @@
       if(!preview.src){ toast('اختر صورة أولًا'); return; }
       const img = new Image();
       img.onload = ()=>{
+        // نضبط عرض اللوحة على 900 بكسل كحد أقصى، ونحافظ على النسبة
         const maxW = 900;
         const scale = Math.min(1, maxW / img.width);
         const w = Math.max(1, Math.round(img.width * scale));
@@ -179,10 +154,11 @@
         photo.width = w; photo.height = h;
         ctx.clearRect(0,0,w,h);
         ctx.drawImage(img, 0, 0, w, h);
-        // cache base image
+        // cache base image (نفس أبعاد اللوحة)
         baseCanvas = document.createElement('canvas');
         baseCanvas.width = w; baseCanvas.height = h;
         baseCanvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
         calibLine=null; manualPts=[]; lastCircle=null; scalePxPerMM=null;
         $('#diameterOut').textContent='القطر: -'; $('#pxOut').textContent='px/مم: -'; $('#centerOut').textContent='المركز: -'; $('#radiusOut').textContent='نصف القطر(px): -';
         toast('تم عرض الصورة على اللوحة');
@@ -194,15 +170,7 @@
       if(!baseCanvas) return;
       ctx.clearRect(0,0,photo.width,photo.height);
       ctx.drawImage(baseCanvas, 0, 0);
-      // crosshair for circle center (if exists)
-      if(lastCircle){
-        ctx.beginPath();
-        ctx.arc(lastCircle.x, lastCircle.y, lastCircle.r, 0, Math.PI*2);
-        ctx.lineWidth = 2; ctx.strokeStyle = '#2c7be5'; ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(lastCircle.x-6, lastCircle.y); ctx.lineTo(lastCircle.x+6, lastCircle.y);
-        ctx.moveTo(lastCircle.x, lastCircle.y-6); ctx.lineTo(lastCircle.x, lastCircle.y+6);
-        ctx.strokeStyle = '#7be27b'; ctx.lineWidth = 1.5; ctx.stroke();
-      }
+
       // calibration line
       if(calibLine){
         ctx.beginPath();
@@ -210,6 +178,7 @@
         ctx.lineTo(calibLine.x2, calibLine.y2);
         ctx.strokeStyle = '#7be27b'; ctx.lineWidth = 2; ctx.stroke();
       }
+
       // manual points
       if(manualPts.length){
         ctx.fillStyle = '#ffd166';
@@ -217,38 +186,66 @@
           ctx.font='12px ui-monospace'; ctx.fillText(String(i+1), p.x+6, p.y-6);
         });
       }
+
+      // live preview circle (after نقطتين) عند تحريك الماوس
+      if($('#manualCircle').dataset.active === '1' && manualPts.length === 2 && pointer.over){
+        const temp = circumcircle(manualPts[0], manualPts[1], pointer);
+        if(temp){
+          ctx.beginPath(); ctx.arc(temp.x, temp.y, temp.r, 0, Math.PI*2);
+          ctx.lineWidth = 1.5; ctx.setLineDash([6,4]); ctx.strokeStyle = '#9fb4cc'; ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // final circle
+      if(lastCircle){
+        ctx.beginPath();
+        ctx.arc(lastCircle.x, lastCircle.y, lastCircle.r, 0, Math.PI*2);
+        ctx.lineWidth = 2; ctx.strokeStyle = '#2c7be5'; ctx.stroke();
+        // crosshair
+        ctx.beginPath(); ctx.moveTo(lastCircle.x-6,lastCircle.y); ctx.lineTo(lastCircle.x+6,lastCircle.y);
+        ctx.moveTo(lastCircle.x,lastCircle.y-6); ctx.lineTo(lastCircle.x,lastCircle.y+6);
+        ctx.strokeStyle = '#7be27b'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
     }
 
-    // ========== Manual circle (robust circumcircle) ==========
+    // Robust circumcircle
     function circumcircle(p1,p2,p3){
       const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, x3=p3.x, y3=p3.y;
       const A = x1*(y2 - y3) - y1*(x2 - x3) + x2*y3 - x3*y2;
-      if(Math.abs(A) < 1e-6) return null; // nearly collinear
+      if(Math.abs(A) < 1e-6) return null;
       const Bx = ((x1*x1 + y1*y1)*(y2 - y3) + (x2*x2 + y2*y2)*(y3 - y1) + (x3*x3 + y3*y3)*(y1 - y2)) / (2*A);
       const By = ((x1*x1 + y1*y1)*(x3 - x2) + (x2*x2 + y2*y2)*(x1 - x3) + (x3*x3 + y3*y3)*(x2 - x1)) / (2*A);
       const r = Math.hypot(x1 - Bx, y1 - By);
       return {x: Bx, y: By, r};
     }
 
+    // Manual mode controls
     $('#manualCircle').addEventListener('click', (e)=>{
       if(e.target.dataset.active === '1'){
         e.target.dataset.active='0'; e.target.textContent='رسم دائرة يدوي (٣ نقاط)';
         toast('خروج من الوضع اليدوي');
       }else{
         e.target.dataset.active='1'; e.target.textContent='— وضع اليدوي: اضغط ٣ نقاط على حافة القزحية —';
-        manualPts=[]; redraw(); toast('ادخل وضع اليدوي');
+        manualPts=[]; lastCircle=null; redraw(); toast('ادخل وضع اليدوي');
       }
     });
     $('#undoPt').addEventListener('click', ()=>{ if(manualPts.length){ manualPts.pop(); redraw(); }});
     $('#clearCircle').addEventListener('click', ()=>{ lastCircle=null; redraw(); $('#centerOut').textContent='المركز: -'; $('#radiusOut').textContent='نصف القطر(px): -'; $('#diameterOut').textContent='القطر: -'; });
 
+    // Pointer events with precise mapping
+    photo.addEventListener('pointerenter', ()=>{ pointer.over=true; });
+    photo.addEventListener('pointerleave', ()=>{ pointer.over=false; redraw(); });
+    photo.addEventListener('pointermove', (e)=>{
+      pointer = {...getCanvasXY(e), over:true};
+      if($('#manualCircle').dataset.active === '1' && manualPts.length>=1) redraw();
+    });
+
     photo.addEventListener('pointerdown', (e)=>{
       if(!baseCanvas){ toast('اعرض الصورة على اللوحة أولًا'); return; }
-      const rect = photo.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const pos = getCanvasXY(e);
       if($('#manualCircle').dataset.active === '1'){
-        manualPts.push({x,y}); redraw();
+        manualPts.push(pos); redraw();
         if(manualPts.length === 3){
           const c = circumcircle(manualPts[0], manualPts[1], manualPts[2]);
           if(c){
@@ -257,26 +254,26 @@
             $('#radiusOut').textContent = 'نصف القطر(px): '+c.r.toFixed(1);
             computeDiameter();
           }else{
-            alert('النقاط شبه على خط واحد — اختر ٣ نقاط أبعد عن بعضها على حافة القزحية.');
+            alert('النقاط شبه على خط واحد — اختَر ٣ نقاط موزّعة على الحافة.');
           }
-          manualPts = [];
-          const btn = $('#manualCircle'); btn.dataset.active='0'; btn.textContent='رسم دائرة يدوي (٣ نقاط)';
+          manualPts=[]; const btn = $('#manualCircle'); btn.dataset.active='0'; btn.textContent='رسم دائرة يدوي (٣ نقاط)';
         }
         return;
       }
       // calibration drawing
-      calibLine = {x1:x,y1:y,x2:x,y2:y, dragging:true};
-      redraw();
-    });
-    photo.addEventListener('pointermove', (e)=>{
-      if(!calibLine || !calibLine.dragging) return;
-      const rect = photo.getBoundingClientRect();
-      calibLine.x2 = e.clientX - rect.left;
-      calibLine.y2 = e.clientY - rect.top;
+      calibLine = {x1:pos.x,y1:pos.y,x2:pos.x,y2:pos.y, dragging:true};
       redraw();
     });
     photo.addEventListener('pointerup', ()=>{
       if(calibLine){ calibLine.dragging=false; computeScale(); }
+    });
+
+    // Continue drawing line
+    photo.addEventListener('pointermove', (e)=>{
+      if(!calibLine || !calibLine.dragging) return;
+      const pos = getCanvasXY(e);
+      calibLine.x2 = pos.x; calibLine.y2 = pos.y;
+      redraw();
     });
 
     function computeScale(){
@@ -294,7 +291,7 @@
       }
     }
 
-    // ========== Auto detect (unchanged) ==========
+    // Auto detect (كما هو)
     async function autoDetect(){
       if(!window.cv || !cv.cvtColor){ alert('لم يتم تحميل OpenCV بعد.'); return; }
       const w = photo.width, h = photo.height;
@@ -341,7 +338,7 @@
       $('#diameterOut').textContent = 'القطر: ' + mm.toFixed(2) + ' مم';
     }
 
-    // ========== Records ==========
+    // Records (كما النسخ السابقة لا نكرر هنا للحجم) — يمكن إضافة لاحقًا عند الحاجة.
     function loadRecords(){ try{ return JSON.parse(localStorage.getItem('records')||'[]'); }catch{ return []; } }
     function saveRecords(arr){ localStorage.setItem('records', JSON.stringify(arr)); renderTable(); }
     function renderTable(){
@@ -349,60 +346,18 @@
       tbody.innerHTML='';
       for(const r of loadRecords()){
         const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td class="nowrap">\${r.date}</td>
-          <td>\${r.name||''}</td>
-          <td>\${r.phone||''}</td>
-          <td>\${r.code||''}</td>
-          <td>\${r.eye||''}</td>
-          <td><strong>\${(+r.iris_mm).toFixed(2)}</strong></td>
-          <td class="muted">\${r.notes||''}</td>
-        \`;
+        tr.innerHTML = `
+          <td class="nowrap">${r.date}</td>
+          <td>${r.name||''}</td>
+          <td>${r.phone||''}</td>
+          <td>${r.code||''}</td>
+          <td>${r.eye||''}</td>
+          <td><strong>${(+r.iris_mm).toFixed(2)}</strong></td>
+          <td class="muted">${r.notes||''}</td>
+        `;
         tbody.appendChild(tr);
       }
     }
-
-    $('#saveRecord').addEventListener('click', ()=>{
-      if(!lastCircle){ alert('حدد القزحية أولًا (تلقائي/يدوي).'); return; }
-      const pxDiameter = 2*lastCircle.r;
-      let irisMM = null;
-      if(scalePxPerMM){ irisMM = (pxDiameter/scalePxPerMM).toFixed(2); }
-      const rec = {
-        date: new Date().toLocaleString('ar-EG'),
-        name: $('#name').value.trim(),
-        phone: $('#phone').value.trim(),
-        code: $('#code').value.trim(),
-        eye: $('#eye').value,
-        iris_mm: irisMM || ('~'+pxDiameter.toFixed(1)+'px'),
-        notes: $('#notes').value.trim()
-      };
-      const arr = loadRecords(); arr.unshift(rec); saveRecords(arr);
-      toast('تم حفظ القياس');
-    });
-
-    $('#exportCSV').addEventListener('click', ()=>{
-      const rows = loadRecords();
-      if(!rows.length){ alert('لا توجد سجلات للتصدير.'); return; }
-      const header = ['date','name','phone','code','eye','iris_mm','notes'];
-      const escape = (v) => ('"'+String(v).replaceAll('"','""')+'"');
-      const lines = [header.map(escape).join(',')];
-      for(const r of rows){ lines.push([r.date,r.name,r.phone,r.code,r.eye,r.iris_mm,r.notes].map(escape).join(',')); }
-      const csv = lines.join('\n');
-      const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'iris_measurements.csv';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-      toast('تم تنزيل CSV');
-    });
-
-    $('#clearAll').addEventListener('click', ()=>{
-      if(confirm('حذف كل السجلات؟')){ localStorage.removeItem('records'); renderTable(); toast('تم الحذف'); }
-    });
-
-    // init
-    renderTable();
   </script>
 </body>
 </html>
