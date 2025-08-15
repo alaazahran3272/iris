@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>قياس قطر القزحية — V7 (تحريك/تغيير حجم الدائرة + لمس)</title>
+<title>قياس قطر القزحية — V7.1 (تحريك من أي مكان داخل الدائرة)</title>
 <style>
   :root { --pad: 12px; --radius: 12px; }
   html, body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Helvetica Neue", Arial, "Noto Color Emoji", sans-serif; background:#0b0f14; color:#e8eef6; }
@@ -19,26 +19,22 @@
   button.primary { background:#2c7be5; border-color:#2c7be5; color:white; }
   button.ghost { background:transparent; }
   .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .hint { font-size:.85rem; color:#9fb4cc; }
   .badge { padding:2px 8px; border-radius:999px; background:#142034; border:1px solid #24364a; font-size:.75rem; }
   canvas, img.preview { width: 100%; max-height: 70vh; border-radius: 12px; background:#02060a; object-fit: contain; touch-action: none; }
-  .table { width:100%; border-collapse: collapse; }
-  .table th, .table td { border-bottom:1px solid #1f2a36; padding:8px; font-size:.9rem; text-align: right; }
-  .muted { opacity:.7; }
-  .error { color:#ff8a8a; }
-  #toast { position: fixed; bottom: 16px; right: 16px; background:#0b1520; border:1px solid #1e2c3c; padding:10px 12px; border-radius:10px; display:none; }
-  @media (max-width: 680px){ .grid2, .grid3 { grid-template-columns: 1fr; } }
+  .floating-hint { position:absolute; left:12px; top:56px; font-size:.9rem; color:#9fb4cc; background:#0b1520; border:1px solid #1e2c3c; padding:6px 10px; border-radius:10px; }
+  .canvas-wrap { position: relative; }
+  @media (max-width: 680px){ .grid2 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
   <header>
-    <h1>🧿 قياس قطر القزحية — V7 (تحريك وتغيير حجم الدائرة + لمس)</h1>
+    <h1>🧿 قياس قطر القزحية — V7.1 (تحريك من أي مكان داخل الدائرة)</h1>
   </header>
 
   <main>
     <section>
-      <div class="hint">جديد: بعد رسم الدائرة (تلقائي أو يدوي)، تقدر <b>تحركها</b> من المركز، وتقدر <b>تكبر/تصغر</b> من الحافة أو بالـ<b>Pinch</b> على الشاشات اللمس. لو الكاش قديم افتح الرابط بـ <code>?v=7</code>.</div>
+      <div class="hint">جديد: تقدر <b>تحرّك الدائرة</b> بسحب <b>من أي مكان داخلها</b>، مش لازم تمسك المركز. كمان كبرنا مساحة المقبضات. لو الكاش قديم افتح بـ <code>?v=7.1</code>.</div>
     </section>
 
     <section id="upload">
@@ -50,7 +46,10 @@
       </div>
       <div class="grid2" style="margin-top:8px;">
         <img id="preview" class="preview" alt="معاينة (قبل الرسم)">
-        <canvas id="photo"></canvas>
+        <div class="canvas-wrap">
+          <div id="moveHint" class="floating-hint" style="display:none;">اسحب داخل الدائرة للتحريك • اسحب الحافة للتكبير/التصغير • أو Pinch باللمس</div>
+          <canvas id="photo"></canvas>
+        </div>
       </div>
       <div id="errorMsg" class="error"></div>
     </section>
@@ -78,7 +77,7 @@
       </div>
     </section>
 
-    <footer>© 2025 — أداة قياس القزحية — V7</footer>
+    <footer>© 2025 — أداة قياس القزحية — V7.1</footer>
   </main>
 
   <div id="toast"></div>
@@ -90,6 +89,7 @@
     const $ = (sel) => document.querySelector(sel);
     const preview = $('#preview');
     const photo = $('#photo');
+    const moveHint = $('#moveHint');
     const ctx = photo.getContext('2d', { willReadFrequently: true });
 
     let calibLine = null;
@@ -104,11 +104,10 @@
     let activeId = null;
     let startPos = null;
     let startCircle = null;
-    const HANDLE_R = 10;     // hit radius for center and rim handle
+    let HANDLE_R = 14;       // bigger for touch
 
     function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',1800); }
 
-    // Helpers
     function getCanvasXY(evt){
       const rect = photo.getBoundingClientRect();
       const sx = photo.width / rect.width;
@@ -119,39 +118,34 @@
       if(!baseCanvas) return;
       ctx.clearRect(0,0,photo.width,photo.height);
       ctx.drawImage(baseCanvas, 0, 0);
-
-      // calib line
       if(calibLine){
         ctx.beginPath(); ctx.moveTo(calibLine.x1, calibLine.y1); ctx.lineTo(calibLine.x2, calibLine.y2);
         ctx.strokeStyle='#7be27b'; ctx.lineWidth=2; ctx.stroke();
       }
-
-      // manual points
       if(manualPts.length){
         ctx.fillStyle='#ffd166';
         manualPts.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill(); ctx.font='12px ui-monospace'; ctx.fillText(String(i+1),p.x+6,p.y-6); });
       }
-
-      // circle
       if(lastCircle){
         ctx.beginPath(); ctx.arc(lastCircle.x,lastCircle.y,lastCircle.r,0,Math.PI*2);
         ctx.lineWidth=2; ctx.strokeStyle='#2c7be5'; ctx.stroke();
         // center handle
         ctx.beginPath(); ctx.arc(lastCircle.x,lastCircle.y,HANDLE_R,0,Math.PI*2);
         ctx.fillStyle='rgba(123,226,123,0.35)'; ctx.fill(); ctx.strokeStyle='#7be27b'; ctx.stroke();
-        // rim handle @ angle 0 (rightmost point)
+        // rim handle
         const hx = lastCircle.x + lastCircle.r, hy = lastCircle.y;
         ctx.beginPath(); ctx.arc(hx,hy,HANDLE_R,0,Math.PI*2);
         ctx.fillStyle='rgba(255,209,102,0.35)'; ctx.fill(); ctx.strokeStyle='#ffd166'; ctx.stroke();
       }
     }
     function updateOutputs(){
-      if(!lastCircle){ $('#centerOut').textContent='المركز: -'; $('#radiusOut').textContent='نصف القطر(px): -'; $('#diameterOut').textContent='القطر: -'; return; }
+      if(!lastCircle){ $('#centerOut').textContent='المركز: -'; $('#radiusOut').textContent='نصف القطر(px): -'; $('#diameterOut').textContent='القطر: -'; moveHint.style.display='none'; return; }
       $('#centerOut').textContent = 'المركز: ('+lastCircle.x.toFixed(1)+', '+lastCircle.y.toFixed(1)+')';
       $('#radiusOut').textContent = 'نصف القطر(px): '+lastCircle.r.toFixed(1);
       const pxDiameter = 2*lastCircle.r;
       if(scalePxPerMM){ $('#diameterOut').textContent = 'القطر: '+(pxDiameter/scalePxPerMM).toFixed(2)+' مم'; }
       else { $('#diameterOut').textContent = 'القطر (بدون معايرة): '+pxDiameter.toFixed(1)+' px'; }
+      moveHint.style.display='block';
     }
 
     // Image load
@@ -186,7 +180,7 @@
       img.src = preview.src;
     });
 
-    // Manual circle (same circumcircle as V6)
+    // Manual circle
     function circumcircle(p1,p2,p3){
       const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, x3=p3.x, y3=p3.y;
       const A = x1*(y2 - y3) - y1*(x2 - x3) + x2*y3 - x3*y2;
@@ -208,7 +202,7 @@
     $('#undoPt').addEventListener('click', ()=>{ if(manualPts.length){ manualPts.pop(); redraw(); }});
     $('#clearCircle').addEventListener('click', ()=>{ lastCircle=null; redraw(); updateOutputs(); });
 
-    // Pointer handling (draw calib / edit circle / manual points / pinch)
+    // Pointer handling
     const pointers = new Map(); // id -> {x,y}
     function onPointerDown(e){
       if(!baseCanvas) { toast('اعرض الصورة على اللوحة أولًا'); return; }
@@ -216,17 +210,7 @@
       const pos = getCanvasXY(e);
       pointers.set(e.pointerId, pos);
 
-      // Pinch start (two pointers + circle exists)
-      if(pointers.size === 2 && lastCircle){
-        dragMode = 'pinch';
-        activeId = null;
-        startCircle = {...lastCircle};
-        const [p1,p2] = Array.from(pointers.values());
-        startPos = {d: Math.hypot(p1.x - p2.x, p1.y - p2.y)};
-        return;
-      }
-
-      // Manual mode
+      // Manual mode first
       if($('#manualCircle').dataset.active === '1'){
         manualPts.push(pos); redraw();
         if(manualPts.length === 3){
@@ -238,22 +222,27 @@
         return;
       }
 
+      // Pinch start (two pointers + circle exists)
+      if(pointers.size === 2 && lastCircle){
+        dragMode = 'pinch'; activeId = null;
+        startCircle = {...lastCircle};
+        const [p1,p2] = Array.from(pointers.values());
+        startPos = {d: Math.hypot(p1.x - p2.x, p1.y - p2.y)};
+        return;
+      }
+
       // Edit circle if exists
       if(lastCircle){
         const distToCenter = Math.hypot(pos.x - lastCircle.x, pos.y - lastCircle.y);
-        const distToRim = Math.abs(distToCenter - lastCircle.r);
-        if(distToCenter <= HANDLE_R){ // move
-          dragMode='move'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle};
-          return;
-        }
+        const inside = distToCenter <= lastCircle.r; // NEW: move from anywhere inside
         const rimPoint = {x: lastCircle.x + lastCircle.r, y: lastCircle.y};
-        if(Math.hypot(pos.x - rimPoint.x, pos.y - rimPoint.y) <= HANDLE_R || distToRim <= HANDLE_R){
-          dragMode='resize'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle};
-          return;
-        }
+        const nearRim = Math.hypot(pos.x - rimPoint.x, pos.y - rimPoint.y) <= HANDLE_R || Math.abs(distToCenter - lastCircle.r) <= HANDLE_R;
+
+        if(inside){ dragMode='move'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle}; return; }
+        if(nearRim){ dragMode='resize'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle}; return; }
       }
 
-      // Calibration line start
+      // Calibration
       calibLine = {x1:pos.x, y1:pos.y, x2:pos.x, y2:pos.y, dragging:true};
       redraw();
     }
@@ -284,7 +273,6 @@
         redraw(); updateOutputs(); return;
       }
 
-      // Continue calibration drawing
       if(calibLine && calibLine.dragging){
         calibLine.x2 = pos.x; calibLine.y2 = pos.y; redraw(); return;
       }
@@ -317,7 +305,7 @@
       }
     }
 
-    // Auto detect (كما هو)
+    // Auto detect
     async function autoDetect(){
       if(!window.cv || !cv.cvtColor){ alert('لم يتم تحميل OpenCV بعد.'); return; }
       const w = photo.width, h = photo.height;
@@ -344,7 +332,7 @@
         }
       }
       src.delete(); gray.delete(); blur.delete(); circles.delete();
-      if(lastCircle){ redraw(); updateOutputs(); toast('تم اكتشاف القزحية — يمكنك تحريك/تغيير الحجم الآن'); }
+      if(lastCircle){ redraw(); updateOutputs(); toast('تم اكتشاف القزحية — يمكنك التحريك/التكبير الآن'); }
       else { alert('لم يتم العثور على دائرة مناسبة.'); }
     }
     $('#autoDetect').addEventListener('click', autoDetect);
