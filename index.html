@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>قياس قطر القزحية — V7.2 (وضع التحريك + لمس)</title>
+<title>قياس قطر القزحية — V8 (وضع سهل)</title>
 <style>
   :root { --pad: 12px; --radius: 12px; }
   html, body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Helvetica Neue", Arial, "Noto Color Emoji", sans-serif; background:#0b0f14; color:#e8eef6; }
@@ -19,90 +19,79 @@
   button.primary { background:#2c7be5; border-color:#2c7be5; color:white; }
   button.ghost { background:transparent; }
   .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .badge { padding:2px 8px; border-radius:999px; background:#142034; border:1px solid #24364a; font-size:.75rem; }
+  .grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .badge { padding:2px 8px; border-radius:999px; background:#142034; border:1px solid #24364a; font-size:.85rem; }
   canvas, img.preview { width: 100%; max-height: 70vh; border-radius: 12px; background:#02060a; object-fit: contain; touch-action: none; }
-  .floating-hint { position:absolute; left:12px; top:56px; font-size:.9rem; color:#9fb4cc; background:#0b1520; border:1px solid #1e2c3c; padding:6px 10px; border-radius:10px; }
-  .canvas-wrap { position: relative; }
-  .status { margin-inline-start:auto; }
+  .controls { display:grid; grid-template-columns: 1fr; gap: 10px; }
+  .slider-row { display:flex; align-items:center; gap:8px; }
+  .slider-row input[type=range] { width: 260px; }
+  .hint { font-size:.9rem; color:#9fb4cc; }
+  .pill { padding:6px 10px; border:1px solid #2c7be5; border-radius:999px; }
+  .kbd { border:1px solid #233548; padding:2px 6px; border-radius:6px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b1520; }
   @media (max-width: 680px){ .grid2 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
   <header>
-    <h1>🧿 قياس قطر القزحية — V7.2 (وضع التحريك + لمس)</h1>
+    <h1>🧿 قياس قطر القزحية — V8 (وضع سهل)</h1>
   </header>
 
   <main>
-    <section>
-      <div class="row">
-        <div class="hint">جديد: زر <b>وضع التحريك</b> — لما تشغّله تقدر تحرّك الدائرة بالسحب من أي مكان على اللوحة. وإلاّ: اسحب <b>داخل الدائرة</b> للتحريك، وعلى <b>الحافة</b> للتكبير/التصغير، أو استخدم <b>Pinch</b>.</div>
-        <span id="moveBadge" class="badge status" style="display:none;">وضع التحريك: مفعل</span>
-      </div>
-    </section>
-
-    <section id="upload">
-      <h3>رفع صورة</h3>
+    <section class="controls">
       <div class="row">
         <input id="file" type="file" accept="image/*">
         <button id="btnToCanvas" class="primary">عرض على اللوحة</button>
-        <button id="toggleMove" class="ghost">وضع التحريك: إيقاف</button>
+        <span class="pill" id="easyBadge">وضع سهل: مفعل</span>
       </div>
-      <div class="grid2" style="margin-top:8px;">
-        <img id="preview" class="preview" alt="معاينة (قبل الرسم)">
-        <div class="canvas-wrap">
-          <div id="moveHint" class="floating-hint" style="display:none;">اسحب داخل الدائرة للتحريك • على الحافة للتكبير/التصغير • أو Pinch</div>
-          <canvas id="photo"></canvas>
-        </div>
+      <div class="row">
+        <span class="badge">اضغطي/المسي على القزحية لوضع مركز الدائرة</span>
+        <span class="badge">اسحبي في أي مكان لتحريكها</span>
+        <span class="badge">كبّري/صغّري من الشريط أو بـ Pinch</span>
       </div>
-      <div id="errorMsg" class="error"></div>
-    </section>
-
-    <section id="controls">
-      <h3>المعايرة والقياس</h3>
+      <div class="slider-row">
+        <button id="minus">−</button>
+        <input id="radiusSlider" type="range" min="5" max="400" value="60">
+        <button id="plus">+</button>
+        <span id="radiusOut" class="badge">نصف القطر(px): 60</span>
+      </div>
       <div class="row">
         <span>طول المرجع (مم):</span>
         <input id="knownMM" type="number" step="0.01" value="10" style="width:110px">
         <button id="resetLine">مسح خط المعايرة</button>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button id="autoDetect" class="primary">اكتشاف تلقائي (OpenCV)</button>
-        <button id="manualCircle">رسم دائرة يدوي (٣ نقاط)</button>
-        <button id="undoPt" class="ghost">تراجع عن النقطة</button>
-        <button id="clearCircle" class="ghost">مسح الدائرة</button>
-        <label>Threshold: <input id="th" type="range" min="10" max="200" value="80"> <span id="thVal">80</span></label>
-      </div>
-      <div class="row">
-        <span id="diameterOut" class="badge">القطر: -</span>
+        <button id="autoDetect">اكتشاف تلقائي (اختياري)</button>
         <span id="pxOut" class="badge">px/مم: -</span>
-        <span id="centerOut" class="badge">المركز: -</span>
-        <span id="radiusOut" class="badge">نصف القطر(px): -</span>
+        <span id="diameterOut" class="badge">القطر: -</span>
       </div>
+      <div class="hint">للمعايرة: اسحبي سطر على المسطرة في الصورة وأدخلي طولها بالمليمتر. بعد ضبط المقياس، القطر يظهر بالملليمتر تلقائيًا.</div>
     </section>
 
-    <footer>© 2025 — أداة قياس القزحية — V7.2</footer>
-  </main>
+    <section id="work">
+      <div class="grid2" style="margin-top:10px;">
+        <img id="preview" class="preview" alt="معاينة (قبل الرسم)">
+        <canvas id="photo"></canvas>
+      </div>
+      <div id="errorMsg" class="hint" style="color:#ff8a8a;"></div>
+    </section>
 
-  <div id="toast"></div>
+    <footer class="hint">© 2025 — V8 وضع سهل • لو ما ظهرش التحديث افتح الرابط وفي آخره <code>?v=8</code> أو Ctrl+F5</footer>
+  </main>
 
   <!-- OpenCV.js CDN -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
   <script>
     const $ = (sel) => document.querySelector(sel);
-    const preview = $('#preview');
     const photo = $('#photo');
+    const preview = $('#preview');
     const ctx = photo.getContext('2d', { willReadFrequently: true });
-    const moveHint = $('#moveHint');
-    const moveBadge = $('#moveBadge');
 
-    let calibLine = null, scalePxPerMM = null, manualPts = [];
-    let lastCircle = null, baseCanvas = null;
-    let dragMode = null, activeId = null, startPos = null, startCircle = null;
+    let baseCanvas = null;   // صورة الأساس
+    let lastCircle = null;   // {x,y,r}
+    let calibLine = null;    // للمعايرة
+    let scalePxPerMM = null; // px per mm
+    let drag = {mode:null, start:null, startCircle:null};
     const HANDLE_R = 18;
-    const INSIDE_MARGIN = 24; // move if within r + margin
-    let moveMode = false;     // NEW
 
-    function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',1800); }
     function getCanvasXY(evt){
       const rect = photo.getBoundingClientRect();
       const sx = photo.width / rect.width;
@@ -113,57 +102,37 @@
       if(!baseCanvas) return;
       ctx.clearRect(0,0,photo.width,photo.height);
       ctx.drawImage(baseCanvas, 0, 0);
+      // خط المعايرة
       if(calibLine){
         ctx.beginPath(); ctx.moveTo(calibLine.x1, calibLine.y1); ctx.lineTo(calibLine.x2, calibLine.y2);
         ctx.strokeStyle='#7be27b'; ctx.lineWidth=2; ctx.stroke();
       }
-      if(manualPts.length){
-        ctx.fillStyle='#ffd166';
-        manualPts.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill(); ctx.font='12px ui-monospace'; ctx.fillText(String(i+1),p.x+6,p.y-6); });
-      }
+      // الدائرة
       if(lastCircle){
         ctx.beginPath(); ctx.arc(lastCircle.x,lastCircle.y,lastCircle.r,0,Math.PI*2);
         ctx.lineWidth=2; ctx.strokeStyle='#2c7be5'; ctx.stroke();
-        const hx = lastCircle.x + lastCircle.r, hy = lastCircle.y;
-        // center handle
-        ctx.beginPath(); ctx.arc(lastCircle.x,lastCircle.y,HANDLE_R,0,Math.PI*2);
-        ctx.fillStyle='rgba(123,226,123,0.25)'; ctx.fill(); ctx.strokeStyle='#7be27b'; ctx.stroke();
-        // rim handle
-        ctx.beginPath(); ctx.arc(hx,hy,HANDLE_R,0,Math.PI*2);
-        ctx.fillStyle='rgba(255,209,102,0.25)'; ctx.fill(); ctx.strokeStyle='#ffd166'; ctx.stroke();
+        // مركز
+        ctx.beginPath(); ctx.arc(lastCircle.x,lastCircle.y,6,0,Math.PI*2);
+        ctx.fillStyle='#7be27b'; ctx.fill();
       }
     }
-    function updateOutputs(){
-      if(!lastCircle){ $('#centerOut').textContent='المركز: -'; $('#radiusOut').textContent='نصف القطر(px): -'; $('#diameterOut').textContent='القطر: -'; moveHint.style.display='none'; return; }
-      $('#centerOut').textContent = 'المركز: ('+lastCircle.x.toFixed(1)+', '+lastCircle.y.toFixed(1)+')';
-      $('#radiusOut').textContent = 'نصف القطر(px): '+lastCircle.r.toFixed(1);
-      const pxDiameter = 2*lastCircle.r;
-      if(scalePxPerMM){ $('#diameterOut').textContent = 'القطر: '+(pxDiameter/scalePxPerMM).toFixed(2)+' مم'; }
-      else { $('#diameterOut').textContent = 'القطر (بدون معايرة): '+pxDiameter.toFixed(1)+' px'; }
-      moveHint.style.display='block';
+    function updateReadouts(){
+      if(!lastCircle){ $('#radiusOut').textContent='نصف القطر(px): -'; $('#diameterOut').textContent='القطر: -'; return; }
+      $('#radiusOut').textContent = 'نصف القطر(px): ' + lastCircle.r.toFixed(1);
+      const dpx = 2*lastCircle.r;
+      $('#diameterOut').textContent = scalePxPerMM ? ('القطر: '+(dpx/scalePxPerMM).toFixed(2)+' مم') : ('القطر (px): '+dpx.toFixed(1));
     }
 
-    // Toggle move mode
-    $('#toggleMove').addEventListener('click', ()=>{
-      moveMode = !moveMode;
-      $('#toggleMove').textContent = 'وضع التحريك: ' + (moveMode ? 'تشغيل' : 'إيقاف');
-      moveBadge.style.display = moveMode ? 'inline-block' : 'none';
-      toast(moveMode ? 'وضع التحريك مفعل — اسحب بأي مكان' : 'تم إيقاف وضع التحريك');
-    });
-
-    // Image load
+    // تحميل الصورة وعرضها
     $('#file').addEventListener('change', (ev)=>{
       const f = ev.target.files && ev.target.files[0];
-      if(!f){ toast('لم يتم اختيار ملف'); return; }
-      if(!/^image\//.test(f.type||'')){ $('#errorMsg').textContent='الملف المختار ليس صورة'; return; }
+      if(!f){ return; }
       const url = URL.createObjectURL(f);
       preview.src = url;
-      preview.onload = ()=> toast('تمت المعاينة — اضغط "عرض على اللوحة"');
-      preview.onerror = ()=> $('#errorMsg').textContent='تعذّر معاينة الصورة.';
+      preview.onload = ()=>{};
     });
-
     $('#btnToCanvas').addEventListener('click', ()=>{
-      if(!preview.src){ toast('اختر صورة أولًا'); return; }
+      if(!preview.src){ alert('اختاري صورة أولًا'); return; }
       const img = new Image();
       img.onload = ()=>{
         const maxW = 900;
@@ -171,126 +140,92 @@
         const w = Math.max(1, Math.round(img.width*scale));
         const h = Math.max(1, Math.round(img.height*scale));
         photo.width=w; photo.height=h;
-        ctx.clearRect(0,0,w,h);
-        ctx.drawImage(img,0,0,w,h);
         baseCanvas = document.createElement('canvas');
         baseCanvas.width=w; baseCanvas.height=h;
         baseCanvas.getContext('2d').drawImage(img,0,0,w,h);
-        calibLine=null; manualPts=[]; lastCircle=null; scalePxPerMM=null;
-        $('#pxOut').textContent='px/مم: -'; updateOutputs();
-        toast('تم عرض الصورة على اللوحة');
+        lastCircle = {x:w/2, y:h/2, r: Math.min(w,h)/8};
+        calibLine=null; scalePxPerMM=null;
+        $('#pxOut').textContent='px/مم: -';
+        $('#radiusSlider').max = Math.round(Math.min(w,h)/1.5);
+        $('#radiusSlider').value = Math.round(lastCircle.r);
+        redraw(); updateReadouts();
       };
       img.src = preview.src;
     });
 
-    // Manual circle
-    function circumcircle(p1,p2,p3){
-      const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, x3=p3.x, y3=p3.y;
-      const A = x1*(y2 - y3) - y1*(x2 - x3) + x2*y3 - x3*y2;
-      if(Math.abs(A) < 1e-6) return null;
-      const Bx = ((x1*x1 + y1*y1)*(y2 - y3) + (x2*x2 + y2*y2)*(y3 - y1) + (x3*x3 + y3*y3)*(y1 - y2)) / (2*A);
-      const By = ((x1*x1 + y1*y1)*(x3 - x2) + (x2*x2 + y2*y2)*(x1 - x3) + (x3*x3 + y3*y3)*(x2 - x1)) / (2*A);
-      const r = Math.hypot(x1 - Bx, y1 - By);
-      return {x: Bx, y: By, r};
-    }
-    $('#manualCircle').addEventListener('click', (e)=>{
-      if(e.target.dataset.active === '1'){
-        e.target.dataset.active='0'; e.target.textContent='رسم دائرة يدوي (٣ نقاط)';
-        toast('خروج من وضع اليدوي');
+    // وضع سهل: لمس/نقرة = تحديد المركز فورًا
+    photo.addEventListener('pointerdown', (e)=>{
+      if(!baseCanvas) return;
+      const pos = getCanvasXY(e);
+      // لو الدائرة موجودة، نحدد إذا كان السحب للمعايرة أو للتحريك
+      if(e.shiftKey){ // اختيار خط المعايرة بالسحب (اختياري)
+        calibLine = {x1:pos.x,y1:pos.y,x2:pos.x,y2:pos.y,dragging:true}; redraw(); return;
+      }
+      const inside = lastCircle && Math.hypot(pos.x-lastCircle.x,pos.y-lastCircle.y) <= lastCircle.r + HANDLE_R;
+      if(inside){
+        drag.mode = 'move'; drag.start = pos; drag.startCircle = {...lastCircle};
       }else{
-        e.target.dataset.active='1'; e.target.textContent='— وضع اليدوي: اضغط ٣ نقاط على الحافة —';
-        manualPts=[]; lastCircle=null; redraw(); toast('ادخل وضع اليدوي');
+        // نقرة/لمس في مكان جديد = تحديد مركز جديد
+        lastCircle = lastCircle || {x:pos.x,y:pos.y,r:60};
+        lastCircle.x = pos.x; lastCircle.y = pos.y;
+        redraw(); updateReadouts();
+        // لو ضغطة مطولة نبدأ سحب لتحريك مستمر
+        drag.mode = 'move'; drag.start = pos; drag.startCircle = {...lastCircle};
       }
     });
-    $('#undoPt').addEventListener('click', ()=>{ if(manualPts.length){ manualPts.pop(); redraw(); }});
-    $('#clearCircle').addEventListener('click', ()=>{ lastCircle=null; redraw(); updateOutputs(); });
-
-    // Pointer handling
-    const pointers = new Map(); // id -> {x,y}
-    function onPointerDown(e){
-      if(!baseCanvas) { toast('اعرض الصورة على اللوحة أولًا'); return; }
-      photo.setPointerCapture(e.pointerId);
+    photo.addEventListener('pointermove', (e)=>{
+      if(!baseCanvas) return;
       const pos = getCanvasXY(e);
-      pointers.set(e.pointerId, pos);
-
-      if($('#manualCircle').dataset.active === '1'){
-        manualPts.push(pos); redraw();
-        if(manualPts.length === 3){
-          const c = circumcircle(manualPts[0], manualPts[1], manualPts[2]);
-          if(c){ lastCircle = c; redraw(); updateOutputs(); }
-          else { alert('النقاط شبه على خط واحد — اختَر ٣ نقاط موزّعة.'); }
-          manualPts=[]; const btn=$('#manualCircle'); btn.dataset.active='0'; btn.textContent='رسم دائرة يدوي (٣ نقاط)';
-        }
-        return;
-      }
-
-      // Pinch start
-      if(pointers.size === 2 && lastCircle){
-        dragMode = 'pinch'; activeId = null;
-        startCircle = {...lastCircle};
-        const [p1,p2] = Array.from(pointers.values());
-        startPos = {d: Math.hypot(p1.x - p2.x, p1.y - p2.y)};
-        return;
-      }
-
-      if(lastCircle){
-        const distToCenter = Math.hypot(pos.x - lastCircle.x, pos.y - lastCircle.y);
-        const insideWide = distToCenter <= (lastCircle.r + INSIDE_MARGIN);
-        const rimPoint = {x: lastCircle.x + lastCircle.r, y: lastCircle.y};
-        const nearRim = Math.hypot(pos.x - rimPoint.x, pos.y - rimPoint.y) <= HANDLE_R || Math.abs(distToCenter - lastCircle.r) <= HANDLE_R;
-
-        // Move mode forces moving anywhere
-        if(moveMode){ dragMode='move'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle}; return; }
-
-        if(nearRim){ dragMode='resize'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle}; return; }
-        if(insideWide){ dragMode='move'; activeId=e.pointerId; startPos=pos; startCircle={...lastCircle}; return; }
-      }
-
-      // Calibration
-      calibLine = {x1:pos.x, y1:pos.y, x2:pos.x, y2:pos.y, dragging:true};
-      redraw();
-    }
-    function onPointerMove(e){
-      const pos = getCanvasXY(e);
-      pointers.set(e.pointerId, pos);
-
-      if(dragMode === 'pinch' && lastCircle && pointers.size>=2){
-        const [p1,p2] = Array.from(pointers.values());
-        const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        if(startPos && startPos.d > 5){
-          const scale = d / startPos.d;
-          lastCircle.r = Math.max(5, startCircle.r * scale);
-          redraw(); updateOutputs(); return;
-        }
-      }
-      if(dragMode === 'move' && lastCircle && (moveMode || e.pointerId === activeId)){
-        const dx = pos.x - startPos.x;
-        const dy = pos.y - startPos.y;
-        lastCircle.x = startCircle.x + dx;
-        lastCircle.y = startCircle.y + dy;
-        redraw(); updateOutputs(); return;
-      }
-      if(dragMode === 'resize' && e.pointerId === activeId && lastCircle){
-        const r = Math.hypot(pos.x - startCircle.x, pos.y - startCircle.y);
-        lastCircle.r = Math.max(5, r);
-        redraw(); updateOutputs(); return;
+      if(drag.mode === 'move' && drag.startCircle){
+        lastCircle.x = drag.startCircle.x + (pos.x - drag.start.x);
+        lastCircle.y = drag.startCircle.y + (pos.y - drag.start.y);
+        redraw(); updateReadouts();
       }
       if(calibLine && calibLine.dragging){
-        calibLine.x2 = pos.x; calibLine.y2 = pos.y; redraw(); return;
+        calibLine.x2 = pos.x; calibLine.y2 = pos.y; redraw();
       }
-    }
-    function onPointerUp(e){
-      pointers.delete(e.pointerId);
-      if(dragMode && (e.pointerId === activeId || dragMode==='pinch')){ dragMode=null; activeId=null; startPos=null; startCircle=null; }
-      if(calibLine){ calibLine.dragging=false; computeScale(); }
-    }
-    photo.addEventListener('pointerdown', onPointerDown);
-    photo.addEventListener('pointermove', onPointerMove);
-    photo.addEventListener('pointerup', onPointerUp);
-    photo.addEventListener('pointercancel', onPointerUp);
-    photo.addEventListener('pointerleave', onPointerUp);
+    });
+    photo.addEventListener('pointerup', ()=>{
+      if(calibLine && calibLine.dragging){ calibLine.dragging=false; computeScale(); }
+      drag = {mode:null,start:null,startCircle:null};
+    });
+    photo.addEventListener('pointercancel', ()=>{ drag = {mode:null,start:null,startCircle:null}; });
 
-    // Calibration & Auto detect
+    // Pinch للتكبير/التصغير
+    const pointers = new Map();
+    photo.addEventListener('pointerdown', (e)=>{ pointers.set(e.pointerId, getCanvasXY(e)); });
+    photo.addEventListener('pointermove', (e)=>{
+      if(!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, getCanvasXY(e));
+      if(pointers.size === 2 && lastCircle){
+        const [p1,p2] = Array.from(pointers.values());
+        const d = Math.hypot(p1.x-p2.x,p1.y-p2.y);
+        if(!photo._pinchStart){ photo._pinchStart = d; photo._r0 = lastCircle.r; }
+        const scale = d / photo._pinchStart;
+        lastCircle.r = Math.max(5, photo._r0 * scale);
+        $('#radiusSlider').value = Math.round(lastCircle.r);
+        redraw(); updateReadouts();
+      }
+    });
+    function clearPinch(){ pointers.clear(); photo._pinchStart = null; photo._r0 = null; }
+    photo.addEventListener('pointerup', clearPinch);
+    photo.addEventListener('pointerleave', clearPinch);
+    photo.addEventListener('pointercancel', clearPinch);
+
+    // شريط/أزرار الحجم
+    $('#radiusSlider').addEventListener('input', (e)=>{
+      if(!lastCircle) return;
+      lastCircle.r = parseInt(e.target.value||'0')||0;
+      redraw(); updateReadouts();
+    });
+    $('#minus').addEventListener('click', ()=>{
+      const s = $('#radiusSlider'); s.value = Math.max(parseInt(s.min), parseInt(s.value)-2); s.dispatchEvent(new Event('input'));
+    });
+    $('#plus').addEventListener('click', ()=>{
+      const s = $('#radiusSlider'); s.value = Math.min(parseInt(s.max), parseInt(s.value)+2); s.dispatchEvent(new Event('input'));
+    });
+
+    // معايرة
     function computeScale(){
       if(!calibLine) return;
       const dx = calibLine.x2 - calibLine.x1;
@@ -300,45 +235,37 @@
       if(mm > 0 && px > 5){
         scalePxPerMM = px/mm;
         $('#pxOut').textContent = 'px/مم: ' + scalePxPerMM.toFixed(2);
-        updateOutputs();
-        toast('تم ضبط المقياس');
+        updateReadouts();
       }else{
-        alert('تأكد من إدخال طول مرجع صحيح ورسم خط واضح.');
+        alert('أكتبي طول مرجع صحيح وارسمى خط واضح.');
       }
     }
+    $('#resetLine').addEventListener('click', ()=>{ calibLine=null; scalePxPerMM=null; $('#pxOut').textContent='px/مم: -'; redraw(); updateReadouts(); });
+
+    // اكتشاف تلقائي (اختياري)
     async function autoDetect(){
-      if(!window.cv || !cv.cvtColor){ alert('لم يتم تحميل OpenCV بعد.'); return; }
+      if(!window.cv || !cv.cvtColor){ alert('OpenCV لم يحمّل بعد'); return; }
       const w = photo.width, h = photo.height;
-      if(!w || !h){ alert('اعرض الصورة على اللوحة أولًا.'); return; }
+      if(!w || !h) return;
       const src = new cv.Mat(h, w, cv.CV_8UC4);
-      try{ cv.imread(photo, src); }catch(e){ alert('تعذّر قراءة الصورة بواسطة OpenCV'); return; }
+      try{ cv.imread(photo, src); }catch{ alert('تعذّر قراءة الصورة'); return; }
       const gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
       const blur = new cv.Mat(); cv.medianBlur(gray, blur, 5);
       const circles = new cv.Mat();
-      const dp = 1.2;
-      const minDist = Math.round(Math.min(w,h)/8);
-      const param1 = 100;
-      const param2 = parseInt($('#th').value);
-      const minRadius = Math.round(Math.min(w,h)/16);
-      const maxRadius = Math.round(Math.min(w,h)/3);
+      const dp = 1.2, minDist = Math.round(Math.min(w,h)/8), param1 = 100, param2 = 80;
+      const minRadius = Math.round(Math.min(w,h)/16), maxRadius = Math.round(Math.min(w,h)/3);
       cv.HoughCircles(blur, circles, cv.HOUGH_GRADIENT, dp, minDist, param1, param2, minRadius, maxRadius);
-      lastCircle = null;
-      for (let i = 0; i < circles.cols; ++i) {
-        const x = circles.data32F[i*3];
-        const y = circles.data32F[i*3+1];
-        const r = circles.data32F[i*3+2];
-        if(!lastCircle || Math.abs(x-w/2)+Math.abs(y-h/2) < Math.abs(lastCircle.x-w/2)+Math.abs(lastCircle.y-w/2)){
-          lastCircle = {x, y, r};
-        }
+      if(circles.cols > 0){
+        const x = circles.data32F[0]; const y = circles.data32F[1]; const r = circles.data32F[2];
+        lastCircle = {x,y,r};
+        $('#radiusSlider').value = Math.round(r);
+        redraw(); updateReadouts();
+      }else{
+        alert('لم يتم العثور على دائرة مناسبة.');
       }
       src.delete(); gray.delete(); blur.delete(); circles.delete();
-      if(lastCircle){ redraw(); updateOutputs(); toast('تم اكتشاف القزحية — يمكنك التحريك/التكبير الآن'); }
-      else { alert('لم يتم العثور على دائرة مناسبة.'); }
     }
     $('#autoDetect').addEventListener('click', autoDetect);
-    $('#th').addEventListener('input', (e)=> $('#thVal').textContent = e.target.value);
-    $('#resetLine').addEventListener('click', ()=>{ calibLine=null; redraw(); $('#pxOut').textContent='px/مم: -'; });
-
   </script>
 </body>
 </html>
