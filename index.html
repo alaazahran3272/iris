@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>قياس قطر القزحية — V3 (رفع صورة + معاينة)</title>
+<title>قياس قطر القزحية — V4 (رفع صورة + معاينة قوية)</title>
 <style>
   :root { --pad: 12px; --radius: 12px; }
   html, body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Helvetica Neue", Arial, "Noto Color Emoji", sans-serif; background:#0b0f14; color:#e8eef6; }
@@ -32,32 +32,65 @@
   .error { color:#ff8a8a; }
   .ok { color:#7be27b; }
   #toast { position: fixed; bottom: 16px; right: 16px; background:#0b1520; border:1px solid #1e2c3c; padding:10px 12px; border-radius:10px; display:none; }
+  #log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#0b1520; border:1px solid #1e2c3c; border-radius:12px; padding:10px; max-height:220px; overflow:auto; }
   @media (max-width: 680px){ .grid2, .grid3 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
   <header>
-    <h1>🧿 قياس قطر القزحية — V3 (رفع صورة + معاينة)</h1>
+    <h1>🧿 قياس قطر القزحية — V4 (رفع صورة + معاينة قوية)</h1>
   </header>
 
   <main>
     <section>
-      <div class="hint">لو التعديلات لسه مش ظاهرة بعد تحديث الكود على GitHub، اعمل <b>Hard Refresh</b> (Ctrl+F5) أو افتح الرابط وفيه في آخره <code>?v=3</code> لتخطي الكاش.</div>
+      <div class="hint">لو التعديلات مش ظاهرة بعد رفع الملفات، افتح الرابط وفي آخره <code>?v=4</code> أو اعمل <b>Ctrl + F5</b>.</div>
+    </section>
+
+    <section id="upload">
+      <h3>رفع صورة</h3>
+      <div class="row">
+        <input id="file" type="file" accept="image/*">
+        <button id="btnToCanvas" class="primary">عرض على اللوحة</button>
+        <button id="btnGrid" class="ghost">اختبار الرسم (شبكة)</button>
+        <span class="hint">١) اختر صورة → ٢) ستظهر معاينة → ٣) اضغط "عرض على اللوحة".</span>
+      </div>
+      <div class="grid2" style="margin-top:8px;">
+        <img id="preview" class="preview" alt="معاينة الصورة (قبل الرسم)">
+        <canvas id="photo"></canvas>
+      </div>
+      <div id="errorMsg" class="error"></div>
+      <div id="log"></div>
     </section>
 
     <section id="client">
-      <h3>بيانات العميل</h3>
-      <div class="grid3">
+      <h3>المعايرة والقياس + بيانات العميل</h3>
+      <div class="row">
+        <span>طول المرجع (مم):</span>
+        <input id="knownMM" type="number" step="0.01" value="10" style="width:110px">
+        <button id="resetLine">مسح خط المعايرة</button>
+      </div>
+      <div class="hint">ارسم خط المعايرة بالسحب على اللوحة (يمين)، ثم اكتشف القزحية تلقائيًا أو يدويًا.</div>
+      <div class="row" style="margin-top:8px;">
+        <button id="autoDetect" class="primary">اكتشاف تلقائي (OpenCV)</button>
+        <button id="manualCircle">رسم دائرة يدوي</button>
+        <label>Threshold: <input id="th" type="range" min="10" max="200" value="80"> <span id="thVal">80</span></label>
+      </div>
+      <div class="row">
+        <span id="diameterOut" class="badge">القطر: -</span>
+        <span id="pxOut" class="badge">px/مم: -</span>
+      </div>
+
+      <div class="grid3" style="margin-top:10px;">
         <div>
-          <label>الاسم الكامل</label>
+          <label>الاسم</label>
           <input id="name" placeholder="مثال: أحمد علي" autocomplete="name">
         </div>
         <div>
-          <label>رقم الهاتف</label>
+          <label>الهاتف</label>
           <input id="phone" placeholder="01xxxxxxxxx" inputmode="tel" autocomplete="tel">
         </div>
         <div>
-          <label>رقم الملف / الكود</label>
+          <label>الكود</label>
           <input id="code" placeholder="مثال: C-1021">
         </div>
       </div>
@@ -75,46 +108,11 @@
         </div>
       </div>
       <div class="row" style="margin-top:10px;">
-        <button id="saveClient" class="ghost">حفظ البيانات مؤقتًا</button>
-        <span class="hint" id="clientSaved"></span>
-      </div>
-    </section>
-
-    <section id="upload">
-      <h3>رفع صورة</h3>
-      <div class="row">
-        <input id="file" type="file" accept="image/*">
-        <button id="btnToCanvas" class="primary">عرض على اللوحة</button>
-        <span class="hint">الخطوة ١: معاينة الصورة أدناه. الخطوة ٢: اضغط "عرض على اللوحة".</span>
-      </div>
-      <div class="grid2" style="margin-top:8px;">
-        <img id="preview" class="preview" alt="معاينة الصورة (قبل الرسم)">
-        <canvas id="photo"></canvas>
-      </div>
-
-      <div class="row" style="margin-top:8px;">
-        <span>طول المرجع (مم):</span>
-        <input id="knownMM" type="number" step="0.01" value="10" style="width:110px">
-        <button id="resetLine">مسح خط المعايرة</button>
-      </div>
-      <div class="hint">ارسم خط المعايرة بالسحب على الصورة (على اللوحة اليمنى).</div>
-
-      <div class="row" style="margin-top:8px;">
-        <button id="autoDetect" class="primary">اكتشاف تلقائي (OpenCV)</button>
-        <button id="manualCircle">رسم دائرة يدوي</button>
-        <label>Threshold: <input id="th" type="range" min="10" max="200" value="80"> <span id="thVal">80</span></label>
-      </div>
-      <div class="row">
-        <span id="diameterOut" class="badge">القطر: -</span>
-        <span id="pxOut" class="badge">px/مم: -</span>
-      </div>
-      <div class="row">
         <button id="saveRecord">حفظ القياس + بيانات العميل</button>
         <button id="exportCSV">تصدير CSV</button>
         <button id="clearAll" class="danger">حذف كل السجلات</button>
       </div>
-
-      <div id="errorMsg" class="error"></div>
+      <div class="hint">السجلات تُحفظ محليًا على هذا الجهاز فقط (localStorage).</div>
     </section>
 
     <section id="records">
@@ -133,10 +131,9 @@
         </thead>
         <tbody></tbody>
       </table>
-      <div class="hint">السجلات تُحفظ محليًا على هذا الجهاز (localStorage).</div>
     </section>
 
-    <footer>© 2025 — أداة قياس القزحية — V3</footer>
+    <footer>© 2025 — أداة قياس القزحية — V4</footer>
   </main>
 
   <div id="toast"></div>
@@ -155,6 +152,12 @@
     let lastCircle = null;
     let loadedBlobUrl = null;
 
+    const logBox = $('#log');
+    function log(msg){
+      const p = document.createElement('div');
+      p.textContent = new Date().toLocaleTimeString('ar-EG') + ' — ' + msg;
+      logBox.prepend(p);
+    }
     function toast(msg){
       const t = $('#toast');
       t.textContent = msg;
@@ -162,65 +165,40 @@
       setTimeout(()=> t.style.display='none', 2200);
     }
 
-    function saveClientTemp(){
-      const client = {
-        name: $('#name').value.trim(),
-        phone: $('#phone').value.trim(),
-        code: $('#code').value.trim(),
-        notes: $('#notes').value.trim(),
-        eye: $('#eye').value
-      };
-      localStorage.setItem('client_temp', JSON.stringify(client));
-      $('#clientSaved').textContent = 'تم الحفظ ✔︎';
-      setTimeout(()=>$('#clientSaved').textContent='', 2000);
-      toast('تم حفظ بيانات العميل مؤقتًا');
-    }
-    function loadClientTemp(){
-      try{
-        const s = localStorage.getItem('client_temp');
-        if(!s) return;
-        const c = JSON.parse(s);
-        $('#name').value = c.name || '';
-        $('#phone').value = c.phone || '';
-        $('#code').value = c.code || '';
-        $('#notes').value = c.notes || '';
-        $('#eye').value = c.eye || 'right';
-      }catch{}
-    }
-
-    function loadRecords(){ try{ return JSON.parse(localStorage.getItem('records')||'[]'); }catch{ return []; } }
-    function saveRecords(arr){ localStorage.setItem('records', JSON.stringify(arr)); renderTable(); }
-    function renderTable(){
-      const tbody = document.querySelector('#tbl tbody');
-      tbody.innerHTML='';
-      for(const r of loadRecords()){
-        const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td class="nowrap">\${r.date}</td>
-          <td>\${r.name||''}</td>
-          <td>\${r.phone||''}</td>
-          <td>\${r.code||''}</td>
-          <td>\${r.eye||''}</td>
-          <td><strong>\${(+r.iris_mm).toFixed(2)}</strong></td>
-          <td class="muted">\${r.notes||''}</td>
-        \`;
-        tbody.appendChild(tr);
-      }
-    }
-
-    // Step 1: preview image (img element) — confirms the file is good
+    // ====== PREVIEW LOADING (objectURL + FileReader fallback) ======
     $('#file').addEventListener('change', (ev)=>{
       const f = ev.target.files && ev.target.files[0];
-      if(!f){ toast('لم يتم اختيار ملف'); return; }
-      if(!/^image\//.test(f.type||'')){ $('#errorMsg').textContent='الملف المختار ليس صورة'; return; }
-      if(loadedBlobUrl) URL.revokeObjectURL(loadedBlobUrl);
-      loadedBlobUrl = URL.createObjectURL(f);
-      preview.src = loadedBlobUrl;
-      preview.onload = ()=>{ toast('تمت المعاينة — اضغط "عرض على اللوحة"'); };
-      preview.onerror = ()=>{ $('#errorMsg').textContent='تعذّر معاينة الصورة. قد تكون الصيغة غير مدعومة (HEIC?).'; };
+      if(!f){ toast('لم يتم اختيار ملف'); log('لم يتم اختيار ملف'); return; }
+      $('#errorMsg').textContent = '';
+      log('اختيار ملف: ' + (f.name || 'بدون اسم') + ' — ' + (f.type || 'نوع غير معروف') + ' — ' + f.size + ' بايت');
+      // 1) Try objectURL
+      try{
+        if(loadedBlobUrl) URL.revokeObjectURL(loadedBlobUrl);
+        loadedBlobUrl = URL.createObjectURL(f);
+        preview.src = loadedBlobUrl;
+        preview.onload = ()=>{ toast('تمت المعاينة — اضغط "عرض على اللوحة"'); log('معاينة نجحت عبر objectURL'); };
+        preview.onerror = ()=>{
+          log('فشل المعاينة عبر objectURL — سنجرب FileReader dataURL');
+          // 2) Fallback: FileReader -> dataURL
+          const reader = new FileReader();
+          reader.onload = (e)=>{
+            preview.src = e.target.result;
+            preview.onload = ()=>{ toast('تمت المعاينة (dataURL) — اضغط "عرض على اللوحة"'); log('معاينة نجحت عبر dataURL'); };
+            preview.onerror = ()=>{
+              $('#errorMsg').textContent = 'تعذّر معاينة الصورة. قد تكون الصيغة غير مدعومة (HEIC?).';
+              log('فشل المعاينة عبر dataURL');
+            };
+          };
+          reader.onerror = ()=>{ $('#errorMsg').textContent = 'فشل قراءة الملف.'; log('FileReader error'); };
+          reader.readAsDataURL(f);
+        };
+      }catch(e){
+        $('#errorMsg').textContent = 'خطأ عند معاينة الصورة: ' + e;
+        log('Exception preview: ' + e);
+      }
     });
 
-    // Step 2: draw to canvas (for measuring)
+    // Draw preview into canvas
     $('#btnToCanvas').addEventListener('click', ()=>{
       if(!preview.src){ toast('اختر صورة أولاً'); return; }
       try{
@@ -235,16 +213,29 @@
           ctx.drawImage(img, 0, 0, w, h);
           calibLine = null; manualPts = []; lastCircle = null; scalePxPerMM = null;
           $('#diameterOut').textContent='القطر: -'; $('#pxOut').textContent='px/مم: -';
-          toast('تم عرض الصورة على اللوحة');
+          toast('تم عرض الصورة على اللوحة'); log('رُسمت الصورة على اللوحة: ' + w + 'x' + h);
         };
-        img.crossOrigin = 'anonymous'; // safety (should be local file anyway)
         img.src = preview.src;
       }catch(e){
         $('#errorMsg').textContent = 'تعذّر عرض الصورة على اللوحة: '+e;
+        log('Canvas draw error: ' + e);
       }
     });
 
-    // Drawing + calibration
+    // Draw test grid to confirm canvas works
+    $('#btnGrid').addEventListener('click', ()=>{
+      const w = 800, h = 450;
+      photo.width = w; photo.height = h;
+      ctx.clearRect(0,0,w,h);
+      for(let x=0; x<=w; x+=50){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.strokeStyle='#233548'; ctx.stroke(); }
+      for(let y=0; y<=h; y+=50){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.strokeStyle='#233548'; ctx.stroke(); }
+      ctx.font='14px ui-monospace'; ctx.fillStyle='#9fb4cc'; ctx.fillText('اختبار الرسم: لو شايف الشبكة يبقى الـCanvas شغال', 10, 20);
+      calibLine = null; manualPts = []; lastCircle = null; scalePxPerMM = null;
+      $('#diameterOut').textContent='القطر: -'; $('#pxOut').textContent='px/مم: -';
+      toast('رُسمت شبكة اختبار'); log('تم رسم شبكة اختبار على اللوحة');
+    });
+
+    // ====== CALIBRATION & DETECTION ======
     photo.addEventListener('pointerdown', (e)=>{
       if(photo.width===0 || photo.height===0){ toast('اعرض الصورة على اللوحة أولًا'); return; }
       const rect = photo.getBoundingClientRect();
@@ -276,10 +267,7 @@
     });
 
     function redraw(){
-      // just draw overlays, not re-reading pixels to avoid security errors
-      ctx.save();
-      ctx.globalAlpha = 1;
-      // draw baseline image already present; overlays only:
+      // overlays
       if(calibLine){
         ctx.beginPath();
         ctx.moveTo(calibLine.x1, calibLine.y1);
@@ -299,7 +287,6 @@
         ctx.fillStyle = '#ffd166';
         for(const p of manualPts){ ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fill(); }
       }
-      ctx.restore();
     }
 
     function computeScale(){
@@ -311,7 +298,7 @@
       if(mm > 0 && px > 5){
         scalePxPerMM = px/mm;
         $('#pxOut').textContent = 'px/مم: ' + scalePxPerMM.toFixed(2);
-        toast('Scale ضبط: '+scalePxPerMM.toFixed(2)+' px/mm');
+        toast('تم ضبط المقياس');
       }else{
         alert('تأكد من إدخال طول مرجع صحيح ورسم خط واضح.');
       }
@@ -369,54 +356,53 @@
       $('#diameterOut').textContent = 'القطر: ' + mm.toFixed(2) + ' مم';
     }
 
-    function toCSV(rows){
-      const header = ['date','name','phone','code','eye','iris_mm','notes'];
-      const escape = (v) => ('"'+String(v).replaceAll('"','""')+'"');
-      const lines = [header.map(escape).join(',')];
-      for(const r of rows){ lines.push([r.date,r.name,r.phone,r.code,r.eye,r.iris_mm,r.notes].map(escape).join(',')); }
-      return lines.join('\n');
+    // Records
+    function loadRecords(){ try{ return JSON.parse(localStorage.getItem('records')||'[]'); }catch{ return []; } }
+    function saveRecords(arr){ localStorage.setItem('records', JSON.stringify(arr)); renderTable(); }
+    function renderTable(){
+      const tbody = document.querySelector('#tbl tbody');
+      tbody.innerHTML='';
+      for(const r of loadRecords()){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="nowrap">${r.date}</td>
+          <td>${r.name||''}</td>
+          <td>${r.phone||''}</td>
+          <td>${r.code||''}</td>
+          <td>${r.eye||''}</td>
+          <td><strong>${(+r.iris_mm).toFixed(2)}</strong></td>
+          <td class="muted">${r.notes||''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
     }
 
-    $('#saveClient').addEventListener('click', saveClientTemp);
-    $('#resetLine').addEventListener('click', ()=>{calibLine=null; $('#pxOut').textContent='px/مم: -'; scalePxPerMM=null; redraw(); toast('تم مسح خط المعايرة');});
-    $('#autoDetect').addEventListener('click', autoDetect);
-    $('#manualCircle').addEventListener('click', (e)=>{
-      if(e.target.dataset.active === '1'){
-        e.target.dataset.active = '0'; e.target.textContent = 'رسم دائرة يدوي';
-        toast('خروج من الوضع اليدوي');
-      }else{
-        e.target.dataset.active = '1'; e.target.textContent = '— وضع الرسم اليدوي: اضغط 3 نقاط —'; manualPts = [];
-        toast('دخول الوضع اليدوي');
-      }
-    });
-    $('#th').addEventListener('input', (e)=> $('#thVal').textContent = e.target.value);
-
     $('#saveRecord').addEventListener('click', ()=>{
-      if(!lastCircle){ alert('حدد القزحية أولًا (تلقائي أو يدوي).'); return; }
+      if(!lastCircle){ alert('حدد القزحية أولًا (تلقائي/يدوي).'); return; }
       const pxDiameter = 2*lastCircle.r;
       let irisMM = null;
       if(scalePxPerMM){ irisMM = (pxDiameter/scalePxPerMM).toFixed(2); }
-      const c = {
+      const rec = {
+        date: new Date().toLocaleString('ar-EG'),
         name: $('#name').value.trim(),
         phone: $('#phone').value.trim(),
         code: $('#code').value.trim(),
         eye: $('#eye').value,
+        iris_mm: irisMM || ('~'+pxDiameter.toFixed(1)+'px'),
         notes: $('#notes').value.trim()
       };
-      const rec = {
-        date: new Date().toLocaleString('ar-EG'),
-        name: c.name, phone: c.phone, code: c.code, eye: c.eye,
-        iris_mm: irisMM || ('~'+pxDiameter.toFixed(1)+'px'),
-        notes: c.notes
-      };
-      const arr = loadRecords(); arr.unshift(rec); saveRecords(arr); saveClientTemp();
+      const arr = loadRecords(); arr.unshift(rec); saveRecords(arr);
       toast('تم حفظ القياس');
     });
 
     $('#exportCSV').addEventListener('click', ()=>{
       const rows = loadRecords();
       if(!rows.length){ alert('لا توجد سجلات للتصدير.'); return; }
-      const csv = toCSV(rows);
+      const header = ['date','name','phone','code','eye','iris_mm','notes'];
+      const escape = (v) => ('"'+String(v).replaceAll('"','""')+'"');
+      const lines = [header.map(escape).join(',')];
+      for(const r of rows){ lines.push([r.date,r.name,r.phone,r.code,r.eye,r.iris_mm,r.notes].map(escape).join(',')); }
+      const csv = lines.join('\n');
       const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -429,9 +415,20 @@
     $('#clearAll').addEventListener('click', ()=>{
       if(confirm('حذف كل السجلات؟')){ localStorage.removeItem('records'); renderTable(); toast('تم الحذف'); }
     });
+    $('#resetLine').addEventListener('click', ()=>{calibLine=null; $('#pxOut').textContent='px/مم: -'; scalePxPerMM=null; toast('تم مسح خط المعايرة');});
+    $('#autoDetect').addEventListener('click', autoDetect);
+    $('#manualCircle').addEventListener('click', (e)=>{
+      if(e.target.dataset.active === '1'){
+        e.target.dataset.active = '0'; e.target.textContent = 'رسم دائرة يدوي';
+        toast('خروج من الوضع اليدوي');
+      }else{
+        e.target.dataset.active = '1'; e.target.textContent = '— وضع الرسم اليدوي: اضغط 3 نقاط —'; manualPts = [];
+        toast('دخول الوضع اليدوي');
+      }
+    });
+    $('#th').addEventListener('input', (e)=> $('#thVal').textContent = e.target.value);
 
     // init
-    loadClientTemp();
     renderTable();
   </script>
 </body>
