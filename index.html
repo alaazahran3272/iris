@@ -1,119 +1,213 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>قياس قطر القزحية — V9.3</title>
-  <style>
-    body{margin:0;background:#0b0f14;color:#e8eef6;font-family:system-ui,-apple-system,Segoe UI,Roboto;}
-    header{padding:12px;text-align:center;border-bottom:1px solid #1f2a36;background:#0f1720;position:sticky;top:0;z-index:3}
-    main{padding:12px;max-width:1100px;margin:auto;display:grid;gap:12px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    button{border-radius:10px;border:1px solid #223246;background:#111b27;color:#e8eef6;padding:10px 12px;cursor:pointer}
-    button.primary{background:#2c7be5;border-color:#2c7be5;color:#fff}
-    button.success{background:#2fbf71;border-color:#2fbf71;color:#05220e}
-    button.warn{background:#f9c74f;border-color:#f9c74f;color:#3a2e00}
-    input,select{border-radius:10px;border:1px solid #223246;background:#111b27;color:#e8eef6;padding:8px 10px}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    video,canvas{width:100%;max-height:65vh;border-radius:12px;background:#000;object-fit:contain}
-    .badge{padding:6px 10px;border-radius:999px;background:#142034;border:1px solid #24364a;font-size:.9rem}
-    .muted{color:#9fb4cc;font-size:.9rem}
-    .ok{color:#2fbf71}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>قياس قطر القزحية — V10 (كارت فيزا + فلاش)</title>
+<style>
+  :root{--bg:#0b0f14;--fg:#e8eef6;--muted:#9fb4cc;--panel:#0f1720;--line:#1f2a36;}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto}
+  header{padding:12px;text-align:center;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:3}
+  main{padding:12px;max-width:1100px;margin:auto;display:grid;gap:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button,input{border-radius:10px;border:1px solid #223246;background:#111b27;color:var(--fg);padding:10px 12px}
+  button.primary{background:#2c7be5;border-color:#2c7be5;color:#fff}
+  button.success{background:#2fbf71;border-color:#2fbf71;color:#05220e}
+  button.warn{background:#f9c74f;border-color:#f9c74f;color:#3a2e00}
+  input[type=range]{width:220px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  video,canvas,img{width:100%;max-height:70vh;border-radius:12px;background:#000;object-fit:contain}
+  .badge{padding:6px 10px;border-radius:999px;background:#142034;border:1px solid #24364a;font-size:.9rem}
+  .muted{color:var(--muted);font-size:.9rem}
+</style>
 </head>
 <body>
-<header><h2>🧿 قياس قطر القزحية — V9.3 (تحسينات كاملة)</h2></header>
+<header><h2>🧿 قياس قطر القزحية — V10 (اكتشاف الكارت + فلاش + كشف تلقائي)</h2></header>
 <main>
   <section>
     <div class="row">
-      <button id="start" class="primary">تشغيل الكاميرا</button>
-      <button id="switch">تبديل الكاميرا</button>
-      <button id="restart">إعادة تشغيل</button>
-      <button id="stop">إيقاف</button>
-      <label>حساسية: <input id="thr" type="range" min="50" max="180" value="110"> <span id="thrVal">110</span></label>
-      <label>التقاط تلقائي: <input id="autoCap" type="checkbox" checked></label>
-      <button id="capture" class="success">التقاط يدوي</button>
+      <input id="file" type="file" accept="image/*">
+      <button id="toCanvas" class="primary">عرض الصورة</button>
+      <button id="startCam" class="primary">تشغيل الكاميرا</button>
+      <button id="switchCam">تبديل الكاميرا</button>
+      <button id="torchBtn" class="warn">تشغيل الفلاش</button>
+      <button id="stopCam">إيقاف</button>
+      <label>حساسية القزحية: <input id="thr" type="range" min="50" max="180" value="110"> <span id="thrV">110</span></label>
+      <button id="capture" class="success">التقاط</button>
     </div>
     <div class="row">
-      <button id="toggleTheme" class="warn">تبديل الوضع</button>
-      <button id="zoomBtn">تكبير/تصغير الفيديو</button>
+      <span class="badge">عرض الكارت بالكامل في الإطار؛ الكارت القياسي عرضه <b>85.60 مم</b></span>
+      <span class="badge">لمسة على الفيديو/الصورة = تلميح مكان العين (ROI)</span>
     </div>
   </section>
 
   <section class="grid2">
     <div style="position:relative">
-      <video id="vid" playsinline muted></video>
-      <canvas id="ov"></canvas>
-      <div class="muted">معاينة مباشرة + دائرة مكتشفة <span id="stableMsg"></span></div>
+      <video id="cam" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="muted">معاينة مباشرة (لو متاحة).</div>
     </div>
     <div>
-      <canvas id="snap"></canvas>
-      <div class="muted">الإطار الملتقط — <span id="mmMsg">px/مم: -</span> — <span id="diamMsg">القطر: -</span></div>
+      <canvas id="photo"></canvas>
+      <div class="muted">الصورة/الإطار + القياس — <span id="scaleOut">px/مم: -</span> — <span id="diamOut">القطر: -</span></div>
       <div class="row" style="margin-top:6px">
-        <span>طول المرجع (مم):</span>
-        <input id="knownMM" type="number" step="0.01" value="10" style="width:110px">
-        <button id="autoRuler" class="warn">التقاط المسطرة تلقائيًا</button>
-        <button id="manualLine">رسم خط يدوي</button>
+        <button id="detectCard" class="warn">التقاط الكارت تلقائيًا</button>
+        <button id="detectIris" class="primary">اكتشاف القزحية</button>
       </div>
-      <form id="clientForm" style="margin-top:10px">
-        <div class="row">
-          <input id="cName" placeholder="اسم العميل">
-          <input id="cAge" type="number" placeholder="العمر">
-          <input id="cNotes" placeholder="ملاحظات">
-        </div>
-      </form>
-      <button id="saveCsv" class="primary">حفظ CSV</button>
     </div>
   </section>
 
-  <footer class="muted">V9.3 — جميع المزايا. HTTPS فقط.</footer>
+  <footer class="muted">V10 — يعمل على HTTPS. لو ما ظهرش التحديث استخدمي ?v=10 أو Ctrl+F5.</footer>
 </main>
 
 <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 <script>
-// JS variables and helpers
 const $=s=>document.querySelector(s);
-const vid=$('#vid'), ov=$('#ov'), octx=ov.getContext('2d');
-const snap=$('#snap'), sctx=snap.getContext('2d',{willReadFrequently:true});
-let stream=null, facing='environment', raf=null;
-let lastLive=null,lastSnap=null,pxPerMM=null;
-let stableCount=0, prevLive=null;
-let zoomed=false,theme='dark';
-let manualMode=false, manualStart=null;
-let records=[];
+const cam=$('#cam'), overlay=$('#overlay'), octx=overlay.getContext('2d');
+const photo=$('#photo'), pctx=photo.getContext('2d',{willReadFrequently:true});
+let stream=null, facing='environment', imageCapture=null;
+let roiHint=null, lastCircle=null, pxPerMM=null;
 
-// Fit overlay
-function fitOverlay(){ ov.width=vid.videoWidth||1280; ov.height=vid.videoHeight||720; }
+// === Helpers ===
+function fitOverlay(){ overlay.width=cam.videoWidth||1280; overlay.height=cam.videoHeight||720; }
+function haveCV(){return window.cv && cv.Mat && cv.cvtColor;}
+
+// Load file to photo
+$('#file').addEventListener('change', (e)=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const url=URL.createObjectURL(f);
+  const img=new Image();
+  img.onload=()=>{ photo.width=Math.min(1000,img.width); photo.height=Math.round(img.height*(photo.width/img.width)); pctx.drawImage(img,0,0,photo.width,photo.height); URL.revokeObjectURL(url); lastCircle=null; pxPerMM=null; updateReads(); };
+  img.src=url;
+});
+$('#toCanvas').onclick=()=>{ /* already drawn by onchange */ };
 
 // Camera
-async function startCam(){ try{
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false});
-  vid.srcObject=stream; await vid.play(); fitOverlay(); loop();
-}catch(e){ alert('خطأ الكاميرا: '+e.message); }}
-function stopCam(){ if(raf) cancelAnimationFrame(raf), raf=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null;} vid.srcObject=null; octx.clearRect(0,0,ov.width,ov.height); }
-function switchCam(){ facing=(facing==='user')?'environment':'user'; startCam(); }
-$('#start').onclick=startCam; $('#stop').onclick=stopCam; $('#switch').onclick=switchCam; $('#restart').onclick=()=>{stopCam();startCam();};
-$('#thr').oninput=e=>$('#thrVal').textContent=e.target.value;
-$('#toggleTheme').onclick=()=>{theme=(theme==='dark'?'light':'dark');document.body.style.background=(theme==='dark'?'#0b0f14':'#fff');document.body.style.color=(theme==='dark'?'#e8eef6':'#000');};
-$('#zoomBtn').onclick=()=>{zoomed=!zoomed;vid.style.transform=zoomed?'scale(1.5)':'scale(1)';};
+async function startCam(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+    cam.srcObject=stream; await cam.play(); fitOverlay();
+    const track=stream.getVideoTracks()[0];
+    if('ImageCapture' in window){ try{ imageCapture=new ImageCapture(track); }catch(e){} }
+    loop();
+  }catch(e){ alert('تعذّر تشغيل الكاميرا: '+e.message+'\\nتأكد من HTTPS والإذن.'); }
+}
+function stopCam(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } cam.srcObject=null; octx.clearRect(0,0,overlay.width,overlay.height); }
+async function switchCam(){ facing=(facing==='user')?'environment':'user'; await startCam(); }
+$('#startCam').onclick=startCam; $('#stopCam').onclick=stopCam; $('#switchCam').onclick=switchCam;
 
-// CV detection loop (simplified for brevity)
-function haveCV(){return window.cv&&cv.Mat;}
-function loop(){const step=()=>{octx.clearRect(0,0,ov.width,ov.height); if(haveCV()){ /* omitted full detection code for brevity, similar to v9.2 */ } raf=requestAnimationFrame(step);}; step();}
+// Torch (flash) toggle (Android Chrome usually)
+let torchOn=false;
+$('#torchBtn').onclick=async()=>{
+  try{
+    const track=stream?.getVideoTracks?.()[0];
+    if(!track){ alert('شغّل الكاميرا أولًا'); return; }
+    const caps=track.getCapabilities?.(); if(caps && 'torch' in caps){ await track.applyConstraints({advanced:[{torch:!torchOn}]}); torchOn=!torchOn; $('#torchBtn').textContent=torchOn?'إطفاء الفلاش':'تشغيل الفلاش'; }
+    else if(imageCapture && imageCapture.toggleTorch){ await imageCapture.toggleTorch(); }
+    else { alert('الفلاش غير مدعوم في هذا الجهاز/المتصفح.'); }
+  }catch(e){ alert('تعذّر التحكم في الفلاش: '+e.message); }
+};
 
-// Capture
-function capture(){ snap.width=vid.videoWidth; snap.height=vid.videoHeight; sctx.drawImage(vid,0,0,snap.width,snap.height); if(lastLive){lastSnap={...lastLive};} saveRecord(); beep(); navigator.vibrate?.([200]); }
-$('#capture').onclick=()=>capture();
+// ROI hint
+function canvasXY(canvas,evt){ const r=canvas.getBoundingClientRect(); return {x:(evt.clientX-r.left)*(canvas.width/r.width), y:(evt.clientY-r.top)*(canvas.height/r.height)}; }
+overlay.addEventListener('pointerdown',e=>{ roiHint = canvasXY(overlay,e); });
+photo.addEventListener('pointerdown',e=>{ roiHint = canvasXY(photo,e); });
 
-// Manual line drawing for scale
-$('#manualLine').onclick=()=>{manualMode=true; manualStart=null; alert('اضغط نقطتين على الصورة لرسم خط مرجع');};
-snap.addEventListener('click',e=>{if(!manualMode)return;const r=snap.getBoundingClientRect();const x=(e.clientX-r.left)*(snap.width/r.width);const y=(e.clientY-r.top)*(snap.height/r.height);if(!manualStart){manualStart={x,y};}else{ sctx.beginPath(); sctx.moveTo(manualStart.x,manualStart.y);sctx.lineTo(x,y);sctx.strokeStyle='#ff0';sctx.lineWidth=3;sctx.stroke();const len=Math.hypot(x-manualStart.x,y-manualStart.y);const mm=parseFloat($('#knownMM').value||'0');if(mm>0){pxPerMM=len/mm;$('#mmMsg').textContent='px/مم: '+pxPerMM.toFixed(2);}manualMode=false;manualStart=null;}});
+// Live loop (draw only; detection on demand to save battery)
+function loop(){ const step=()=>{ if(!cam.videoWidth){ requestAnimationFrame(step); return; } octx.clearRect(0,0,overlay.width,overlay.height); if(roiHint){ octx.beginPath(); octx.arc(roiHint.x,roiHint.y,6,0,2*Math.PI); octx.fillStyle='#ffd166'; octx.fill(); } requestAnimationFrame(step); }; step(); }
 
-// Save CSV
-function saveRecord(){ if(!lastSnap)return; const name=$('#cName').value, age=$('#cAge').value, notes=$('#cNotes').value; const d=new Date(); const row=[d.toLocaleString(),name,age,notes,lastSnap.r*2,pxPerMM?((lastSnap.r*2)/pxPerMM).toFixed(2):''].join(','); records.push(row); }
-$('#saveCsv').onclick=()=>{ const header='تاريخ,اسم,عمر,ملاحظات,قطر(px),قطر(مم)\n'; const blob=new Blob([header+records.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='iris_data.csv'; a.click(); };
+$('#capture').onclick=()=>{
+  if(!cam.videoWidth){ alert('الكاميرا غير جاهزة'); return; }
+  photo.width=cam.videoWidth; photo.height=cam.videoHeight; pctx.drawImage(cam,0,0,photo.width,photo.height);
+};
 
-function beep(){ const a=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAAAZGF0YQAAAAA='); a.play().catch(()=>{}); }
+// === Card detection ===
+function detectCard(){
+  if(!haveCV()){ alert('OpenCV لم يحمّل بعد'); return; }
+  if(!photo.width){ alert('التقط صورة أو ارفع ملف أولًا'); return; }
+  const CARD_MM=85.60; // width
+  const src=new cv.Mat(photo.height, photo.width, cv.CV_8UC4); cv.imread(photo, src);
+  const gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+  const blur=new cv.Mat(); cv.GaussianBlur(gray,blur,new cv.Size(5,5),0);
+  const edges=new cv.Mat(); cv.Canny(blur,edges,50,150,3,false);
+  const contours=new cv.MatVector(); const hierarchy=new cv.Mat();
+  cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+  let best=null;
+  for(let i=0;i<contours.size();i++){
+    const cnt=contours.get(i);
+    const peri=cv.arcLength(cnt,true);
+    const approx=new cv.Mat();
+    cv.approxPolyDP(cnt, approx, 0.02*peri, true);
+    if(approx.rows===4){
+      const rect=orderPoly(approx); // 4 points ordered
+      const w = dist(rect[0],rect[1]), h = dist(rect[1],rect[2]);
+      const ar = w>h? (w/h) : (h/w);
+      const area=cv.contourArea(approx);
+      if(area>2000 && ar>1.45 && ar<1.70){ // around 1.586
+        if(!best || area>best.area){ best={rect, area, wPx:w, hPx:h}; }
+      }
+    }
+    approx.delete(); cnt.delete();
+  }
+  src.delete(); gray.delete(); blur.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+  if(!best){ alert('لم أجد كارت واضحًا. تأكد أن الكارت كامل وواضح.'); return; }
+  // draw on photo
+  pctx.lineWidth=3; pctx.strokeStyle='#7be27b'; pctx.beginPath();
+  pctx.moveTo(best.rect[0].x, best.rect[0].y);
+  for(let i=1;i<4;i++) pctx.lineTo(best.rect[i].x, best.rect[i].y);
+  pctx.closePath(); pctx.stroke();
+  // scale
+  const cardPx = Math.max(best.wPx, best.hPx);
+  pxPerMM = cardPx / CARD_MM;
+  updateReads();
+}
+function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
+function orderPoly(approx){
+  const pts=[]; for(let i=0;i<4;i++){ pts.push({x:approx.intPtr(i,0)[0], y:approx.intPtr(i,0)[1]}); }
+  pts.sort((p,q)=>p.x+ p.y - (q.x+q.y)); // tl ≈ min sum, br ≈ max sum
+  const tl=pts[0], br=pts[3];
+  // remaining two: choose by x to get tr, bl
+  const rem=[pts[1],pts[2]].sort((a,b)=>a.x-b.x);
+  const bl=rem[0].y>rem[1].y ? rem[0]:rem[1];
+  const tr=rem[0].y>rem[1].y ? rem[1]:rem[0];
+  return [tl,tr,br,bl];
+}
+
+// === Iris detection ===
+function detectIris(){
+  if(!haveCV()){ alert('OpenCV لم يحمّل بعد'); return; }
+  if(!photo.width){ alert('التقط صورة أو ارفع ملف أولًا'); return; }
+  const src=new cv.Mat(photo.height, photo.width, cv.CV_8UC4); cv.imread(photo, src);
+  let gray=new cv.Mat(); cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY); src.delete();
+  const clahe=new cv.CLAHE(3.0,new cv.Size(8,8)); const eq=new cv.Mat(); clahe.apply(gray,eq); gray.delete(); clahe.delete();
+  const blur=new cv.Mat(); cv.medianBlur(eq,blur,5); eq.delete();
+  let roi=blur, x0=0, y0=0;
+  if(roiHint){ const size=Math.round(Math.min(photo.width,photo.height)*0.4); x0=Math.max(0,Math.min(photo.width-size,Math.round(roiHint.x-size/2))); y0=Math.max(0,Math.min(photo.height-size,Math.round(roiHint.y-size/2))); roi = blur.roi(new cv.Rect(x0,y0,size,size)); }
+  const circles=new cv.Mat();
+  const dp=1.2; const minDist=Math.round(Math.min(roi.cols,roi.rows)/6);
+  const p1=160; const p2=parseInt($('#thr').value);
+  const minR=Math.round(Math.min(roi.cols,roi.rows)*0.07); const maxR=Math.round(Math.min(roi.cols,roi.rows)*0.35);
+  cv.HoughCircles(roi,circles,cv.HOUGH_GRADIENT,dp,minDist,p1,p2,minR,maxR);
+  lastCircle=null;
+  if(circles.cols>0){ const cx=circles.data32F[0]+x0, cy=circles.data32F[1]+y0, r=circles.data32F[2]; lastCircle={x:cx,y:cy,r:r}; }
+  blur.delete(); if(roi!==blur){} circles.delete();
+  // draw
+  if(lastCircle){ pctx.beginPath(); pctx.arc(lastCircle.x,lastCircle.y,lastCircle.r,0,2*Math.PI); pctx.lineWidth=3; pctx.strokeStyle='#2c7be5'; pctx.stroke(); }
+  updateReads();
+}
+$('#thr').oninput=(e)=>$('#thrV').textContent=e.target.value;
+
+function updateReads(){
+  if(pxPerMM){ $('#scaleOut').textContent='px/مم: '+pxPerMM.toFixed(2); } else { $('#scaleOut').textContent='px/مم: -'; }
+  if(lastCircle){
+    const dpx = 2*lastCircle.r;
+    if(pxPerMM){ $('#diamOut').textContent='القطر: '+(dpx/pxPerMM).toFixed(2)+' مم'; }
+    else { $('#diamOut').textContent='القطر (px): '+dpx.toFixed(1)+' — التقط الكارت أولًا'; }
+  } else { $('#diamOut').textContent='القطر: -'; }
+}
+
+$('#detectCard').onclick=detectCard;
+$('#detectIris').onclick=detectIris;
 </script>
 </body>
 </html>
